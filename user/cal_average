@@ -1,0 +1,6 @@
+#!/bin/bash
+cat $1 | grep "fibonacci" > $2
+echo "average runqueue time:"
+cat $2 | cut -d , -f 3 | perl -lane '$total += $F[0]; END{print $total/$.}'
+echo "average running time:"
+cat $2 | cut -d , -f 4 | perl -lane '$total += $F[0]; END{print $total/$.}'

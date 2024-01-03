@@ -1,0 +1,9 @@
+.vscode/
+.vscode-ctags
+**/test
+**/*.o
+**/taskset1
+**/taskset2
+**/test.sh
+**/fibonacci
+**/fibonacci_tail

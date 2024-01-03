@@ -1,0 +1,201 @@
+This file should contain:
+
+- Name & UNI for all group members
+- Homework assignment number
+- How/what each group member contributed to the submission
+- Description for each part
+
+The description should indicate whether your solution for the part is working
+or not, the files you modified/added for your solution, and how you tested any
+code written for the part.
+
+You may also want to include anything else you would like to communicate to
+the grader, such as extra functionality you implemented or how you tried to
+fix your non-working code.
+
+Teng Jiang: Part 2, Part 3, Part 4, Part 5
+tj2488
+Mingfeng Yang: Part 1, Part 3, Part 4
+my2770
+Nagavasavi Jeepalyam: Part 2 and Part 5
+nj2506
+
+Part 1
+We use trace.bt to trace the run queue time and total completion
+time for each process.
+There are 3 scenarios in which we get on the runqueue:
+* When a new task wake up
+* When a task wakes up from the wait queue (right before switch_to())
+* When a task got off the CPU and is put on the requeue again (preempted)
+There is only one scenario in which we get off the runqueue: That is a task
+starts running (right after switch_to())
+
+Part 2
+We implement our sched_class, OVEN, and we have completed every necessary
+function for the class and optimized them.
+
+* We define our oven_rq and sched_oven_entity as follows. We use linked list
+as the data structure of the run queue. We have a list_head oven_rq_list that
+is the head of the list, and all tasks are connected with the run_list
+list_head in the sched_oven_entity in each task struct.
+     oven_rq             oven_se        oven_se
+    --total_weight      --on_rq        --on_rq
+--> --oven_rq_list -->  --run_list --> --run_list --
+|   --oven_nr_running   --weight       --weight    |
+|                                                  |
+----------------------------------------------------
+
+* We enqueue and dequeue with certain rules so that the first task pointed
+to by the oven_rq is the currently running task/next task to run,
+i.e. the one with the lowest weight.
+ - We maintain an ascending order of weight in the linked list
+ - When 2 tasks have the same weight, we put the incoming task after the
+ old task(s), just like a normal queue does
+
+* We have an oven_nr_running that keeps track of the # of tasks on the
+oven_rq. We have an on_rq field that keeps track of whether the task is
+on oven_rq or not.
+
+* We have a field called total_weight that keeps track of the total weight
+of all the tasks on the oven_rq, so that our select_task_rq_oven can pick
+the lightest CPU for a runnable task.
+
+* Meanwhile, we implement update_curr_oven() and other funcs with stats
+trace functionalities and insert them inside several functions.
+
+Part 3
+To minimize the average total time, we use the shortest job first
+strategy. In fibonacci.c, we set the weight of each task to be
+MIN_OVEN_WEIGH + n, so that the shortest job goes first.
+
+Part 4
+We implement balance_oven(). We loop through each online CPU,
+and pick the runnable task with the lowest weight (highest priority) on the
+first CPU we encounter which satisfies our picking rule.
+
+Part 5
+In fibonacci_tail.c, we use the longest job first to enhance tail performance.
+We set the weight of each task to be MAX_OVEN_WEIGHT - 1 - n. So the largest
+task goes first, and this strategy works the best for us compared with other
+strategies, for example:
+* CFS (set sched class to be CFS)
+* Round Robin (set all fibonacci weights to be MAX_OVEN_WEIGHT)
+* Shortest job first
+* FIFO (set all fibonacci weights to be MIN_OVEN_WEIGHT)
+
+For calculation, we have cal_average for calculating the average run queue
+time and completion time and cal_max for 99% maximum completion time and its
+corresponding runqueue time.
+
+For those two bash files, the first parameter is the filename of the
+raw output of trace.bt and the second is the output filename for
+tasksetx_average and other outcome files. For convenience, we also
+have a Python file called fibonacci_stats.py for outputting all the stats.
+
+Completion time for each workload:
+Clarifications:
+For comparing tail performance, we keep track of the maximum total time,
+and the second largest total time, just to be comprehensive. We also keep
+tracks of many not-so-important rq time.
+
+Workload 1:
+1 CPU:
+  CFS Sched:
+    average runqueue time:
+    501.76
+    average running time:
+    557.73
+  OVEN Sched:
+    average runqueue time:
+    244.08
+    average running time:
+    297.5
+
+
+4 CPUs:
+  CFS Sched:
+    average runqueue time:
+    76.55
+    average running time:
+    153.06
+  OVEN Sched:
+    average runqueue time:
+    42.92
+    average running time:
+    113.62
+  balance OVEN Sched:
+    average runqueue time:
+    42.27
+    average running time:
+    117.09
+  tail CFS time:
+    The maximum completion time: 2371
+    The corresponding runqueue time of maximum: 563
+    The 99% maximum (second largest) completion time: 1310
+    The corresponding runqueue time of 99%: 578
+    The maximum runqueue time: 578
+  tail OVEN time:
+    The maximum completion time: 1808
+    The corresponding runqueue time of maximum: 6
+    The 99% maximum (second largest) completion time: 1632
+    The corresponding runqueue time of 99%: 930
+    The maximum runqueue time: 1171
+
+
+Workload 2:
+1 CPU:
+  CFS Sched:
+    average runqueue time:
+    120.5
+    average running time:
+    147.8
+  OVEN Sched:
+    average runqueue time:
+    96.04
+    average running time:
+    123.71
+
+
+4 CPUs:
+  CFS Sched:
+    average runqueue time:
+    13.12
+    average running time:
+    55.71
+  OVEN Sched:
+    average runqueue time:
+    10.09
+    average running time:
+    52.97
+  balance OVEN Sched:
+    average runqueue time:
+    8.49
+    average running time:
+    53.65
+  tail CFS time:
+    The maximum completion time: 1818
+    The corresponding runqueue time of maximum: 34
+    The 99% maximum (second largest) completion time: 767
+    The corresponding runqueue time of 99%: 73
+    The maximum runqueue time: 87
+  tail OVEN time:
+    The maximum completion time: 1762
+    The corresponding runqueue time of maximum: 2
+    The 99% maximum (second largest) completion time: 683
+    The corresponding runqueue time of 99%: 5
+    The maximum runqueue time: 192
+
+Result analysis:
+* Part 3: After using shortest job first strategy for oven class,
+we gained significant improvement over the average total completion
+time, for both 1 core (Workload 1 - CFS: 557.73ms vs OVEN: 297.5ms)
+and 4 cores (Workload 1 - CFS: 153.06ms vs OVEN: 113.62ms)
+Intuitively, the shortest job first alleviates the waiting time for
+all tasks.
+* Part 4: Load balance does not bring us a significant performance
+boost, because we have already balanced our workload in
+select_task_rq_oven()
+* Part 5: OVEN with the longest job first gives us a comparable
+(or even slightly better) tail performance. For example, for task 2,
+CFS's second-largest completion time is 767ms while OVEN's is 683ms.
+

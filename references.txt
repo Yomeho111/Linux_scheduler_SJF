@@ -1,0 +1,13 @@
+Reference List for W4118 Homework
+
+1. https://marc.info/?l=linux1394-devel&m=114328842931957, for part 2
+2. https://mgouzenko.github.io/jekyll/update/2016/11/24/understanding-sched-class.html
+for the understanding of sched_class.
+
+
+Teng Jiang
+tj2488
+Mingfeng Yang
+my2770
+Nagavasavi Jeepalyam
+nj2506

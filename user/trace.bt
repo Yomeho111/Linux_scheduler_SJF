@@ -1,0 +1,69 @@
+#!/bin/bpftrace
+
+#include <linux/sched.h>
+
+BEGIN
+{
+	printf("COMM,PID,RUNQ_MS,TOTAL_MS\n");
+}
+
+tracepoint:sched:sched_wakeup_new
+{
+	// wake up new: put on the runqueue, start tracing and start timing
+	$curr_time = nsecs;
+	@starttime[args->pid] = $curr_time;
+	@runqtime[args->pid] = (uint64)0;
+	@onrqtime[args->pid] = $curr_time;
+	// printf("%s,%d on runqueue (wakeup new)\n",args->comm, args->pid);
+}
+
+tracepoint:sched:sched_wakeup
+{
+	// wake up: put on the runqueue, so start timing. Once trace traced processes (those created after trace.bt started running)
+	$curr_time = nsecs;
+	if(@starttime[args->pid] > 0) {
+		@onrqtime[args->pid] = $curr_time;
+		// printf("%s,%d on runqueue (wakeup)\n",args->comm, args->pid);
+	}
+}
+
+tracepoint:sched:sched_switch
+{
+	// switch: if prev is put on the runqueue (TASK_RUNNING), then start timing again
+	// if not (for example, prev exit or is blocked), do not start timing yet.
+	// stop to time next because it comes out of the runqueue onto the CPU.
+
+	// deal with preemption
+	$curr_time = nsecs;
+	if (@starttime[args->prev_pid] > 0) {
+		if (args->prev_state == TASK_RUNNING) {  // args->prev_state == TASK_RUNNING
+			// printf("%s,%d on runqueue (switch)\n",args->prev_comm, args->prev_pid);
+			@onrqtime[args->prev_pid] = $curr_time;
+		}
+	}
+
+	if (@starttime[args->next_pid] > 0 && @onrqtime[args->next_pid] != 0) {
+		// printf("%s,%d off runqueue\n",args->next_comm, args->next_pid);
+		@runqtime[args->next_pid] += $curr_time - @onrqtime[args->next_pid];
+		@onrqtime[args->next_pid] = 0;
+	}
+}
+
+tracepoint:sched:sched_process_exit
+{
+	$curr_time = nsecs;
+	if (@starttime[args->pid] > 0) {
+		printf("%s,%d,%d,%d\n",args->comm, args->pid, @runqtime[args->pid] / 1000000, ($curr_time - @starttime[args->pid]) / 1000000);
+		delete(@starttime[args->pid]);
+		delete(@runqtime[args->pid]);
+		delete(@onrqtime[args->pid]);
+	}
+}
+
+END
+{
+	// should we print things that has not exited?
+	clear(@starttime);
+	clear(@runqtime);
+	clear(@onrqtime);
+}

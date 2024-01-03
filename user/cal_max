@@ -1,0 +1,5 @@
+#!/bin/bash
+cat $1 | grep "fibonacci" > $2
+# This is for largest completion time
+# cat $2 | perl -F',' -lane '(($max = $F[3]) && ($runtime = $F[2])) if $. == 1 || $F[3] > $max; END{print "corresponding runqueue time"; print $runtime; print "max completion time";print $max}'
+python3 cal_99.py --filename $2
